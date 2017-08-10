@@ -90,6 +90,61 @@ class Pysed(object):
         if len(self.args) > 7:      # write
             self.write = self.args[7]
 
+    def _difftext(self, text1, text2):
+        import difflib
+        text1_lines = text1.splitlines()
+        text2_lines = text2.splitlines()
+        ignore_whitespace = True
+        if ignore_whitespace:
+            text1_lines = [t.rstrip() for t in text1_lines]
+            text2_lines = [t.rstrip() for t in text2_lines]
+            ndiff_kw = dict(linejunk=difflib.IS_LINE_JUNK,
+                            charjunk=difflib.IS_CHARACTER_JUNK)
+        else:
+            ndiff_kw = {}
+        all_diff_lines = list(difflib.ndiff(text1_lines, text2_lines, **ndiff_kw))
+
+        # if num_context_lines is None:
+        diff_lines = all_diff_lines
+        return diff_lines
+        # else:
+        #     from utool import util_list
+        #     # boolean for every line if it is marked or not
+        #     ismarked_list = [len(line) > 0 and line[0] in '+-?'
+        #                      for line in all_diff_lines]
+        #     # flag lines that are within num_context_lines away from a diff line
+        #     isvalid_list = ismarked_list[:]
+        #     for i in range(1, num_context_lines + 1):
+        #         isvalid_list[:-i] = util_list.or_lists(isvalid_list[:-i],
+        #                                                ismarked_list[i:])
+        #         isvalid_list[i:]  = util_list.or_lists(isvalid_list[i:],
+        #                                                ismarked_list[:-i])
+        #     USE_BREAK_LINE = True
+        #     if USE_BREAK_LINE:
+        #         # insert a visual break when there is a break in context
+        #         diff_lines = []
+        #         prev = False
+        #         visual_break = '\n <... FILTERED CONTEXT ...> \n'
+        #         #print(isvalid_list)
+        #         for line, valid in zip(all_diff_lines, isvalid_list):
+        #             if valid:
+        #                 diff_lines.append(line)
+        #             elif prev:
+        #                 if False:
+        #                     diff_lines.append(visual_break)
+        #             prev = valid
+        #     else:
+        #         diff_lines = util_list.compress(all_diff_lines, isvalid_list)
+
+    def _highlight_diff(self, text):
+        import pygments
+        import pygments.lexers
+        import pygments.formatters
+        import pygments.formatters.terminal
+        formater = pygments.formatters.terminal.TerminalFormatter(bg='dark')
+        lexer = pygments.lexers.get_lexer_by_name('diff')
+        return pygments.highlight(text, lexer, formater)
+
     def replaceText(self):
         """Replace text with new
         """
@@ -99,8 +154,12 @@ class Pysed(object):
             count += 1
             if count in self.numlines:
                 try:
-                    self.text += re.sub(self.pattern, self.repl, line,
-                                        self.count, self.flag) + "\n"
+                    newline = re.sub(self.pattern, self.repl, line, self.count,
+                                     self.flag)
+                    if line != newline:
+                        diff = self._difftext(newline, line)
+                        print(self._highlight_diff('\n'.join(diff)))
+                    self.text += newline + "\n"
                 except re.error as e:
                     sys.exit("{0}: {1}".format(__prog__, messageError(
                         000, Err=e)))
@@ -237,7 +296,7 @@ class Pysed(object):
             'blue': '\x1b[34m',
             'magenta': '\x1b[35m',
             'cyan': '\x1b[36m',
-            }
+        }
         try:
             self.color = paint[self.repl]
         except KeyError:
@@ -251,7 +310,9 @@ class Pysed(object):
         if self.write:
             self.writeFile(self.text)
         else:
-            print(self.text.rstrip())
+            diffonly = True
+            if not diffonly:
+                print(self.text.rstrip())
 
     def writeFile(self, newtext):
         """Write data to file
@@ -260,6 +321,7 @@ class Pysed(object):
             for line in newtext.splitlines():
                 fo.write(line + "\n")
             fo.close()
+        print('wrote to ' + self.filename)
 
 
 def messageError(code, Err):
