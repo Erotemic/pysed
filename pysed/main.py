@@ -150,21 +150,28 @@ class Pysed(object):
         """
         self.regexFlags()
         count = 0
-        for line in self.data.splitlines():
+        for line in self.data.splitlines(keepends=True):
             count += 1
             if count in self.numlines:
                 try:
                     newline = re.sub(self.pattern, self.repl, line, self.count,
                                      self.flag)
+                    self.text += newline
                     if line != newline:
-                        diff = self._difftext(newline, line)
-                        print(self._highlight_diff('\n'.join(diff)))
-                    self.text += newline + "\n"
+                        print('line = {!r}'.format(line))
+                        print('newline = {!r}'.format(newline))
+                        show_newlines = True
+                        if show_newlines:
+                            line = line.replace('\n', '\\n')
+                            newline = newline.replace('\n', '\\n')
+                        diff = self._difftext(line, newline)
+                        diff_text = self._highlight_diff('\n'.join(diff))
+                        print(diff_text)
                 except re.error as e:
                     sys.exit("{0}: {1}".format(__prog__, messageError(
                         000, Err=e)))
             else:
-                self.text += line + "\n"
+                self.text += line
         self.selectPrintWrite()
 
     def findallText(self):
@@ -378,6 +385,13 @@ def checkArguments(args):
 
 
 def main():
+    # import argparse
+    # parser = argparse.ArgumentParser(description='pysed')
+    # parser.add_argument('-w', '--write', type=str, help='writes to file')
+    # parser.add_argument('search', nargs='+')
+    # parser.add_argument('replace', nargs='+')
+    # ap = parser.parse_args()
+
     args = sys.argv
     args.pop(0)
     data = ""
@@ -388,10 +402,10 @@ def main():
         usage()
         sys.exit("{0}: {1}".format(__prog__, messageError(200, Err="")))
 
-    if args[-1] == "--write":
+    if args[-1] in ['-w', '--write']:
         isWrite = True
         del args[-1]
-    elif len(args) == 6 and args[-1] is not "--write":
+    elif len(args) == 6 and args[-1] not in ['-w', '--write']:
         usage()
         sys.exit("{0}: {1}".format(__prog__, messageError(300, Err=args[-1])))
 
